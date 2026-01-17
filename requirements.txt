@@ -1,0 +1,13 @@
+# Audio Automation Requirements
+
+# Wake word detection engine
+# Requires AccessKey from https://console.picovoice.ai/
+pvporcupine>=4.0.0
+
+# Audio I/O library (PortAudio wrapper)
+# macOS Note: Run 'brew install portaudio' first
+# Windows Note: May need to install from unofficial wheel binary if pip fails
+pyaudio>=0.2.14
+
+# Scientific computing (used for audio data processing if needed)
+numpy>=2.0.0

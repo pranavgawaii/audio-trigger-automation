@@ -1,0 +1,13 @@
+# Environment
+venv/
+__pycache__/
+.DS_Store
+
+# Configuration with Private Keys
+# We ignore config.py because it contains the PORCUPINE_ACCESS_KEY
+config.py
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
