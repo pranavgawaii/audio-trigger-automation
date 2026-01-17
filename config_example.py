@@ -51,28 +51,18 @@ DEFAULT_PROJECT_PATH = os.path.expanduser("~/Downloads/Development")
 # 5. APP CONFIGURATIONS
 # ==============================================================================
 # List of apps/commands to launch on DOUBLE CLAP.
-# Each item is a dictionary with:
-# - 'command': The main command or app name.
-# - 'args': (Optional) List of arguments, URLs, or file paths.
-# - 'type_msg': Description for the console output.
-
 APPS_TO_LAUNCH = [
     {
-        "command": "code",  # Visual Studio Code command-line identifier
-        "args": [DEFAULT_PROJECT_PATH],
-        "type_msg": "Opening VS Code in Project Path"
-    },
-    {
-        "command": "open",
-        "args": ["-a", "Terminal"],
-        "type_msg": "Opening Terminal"
+        "command": "code",
+        "args": [os.path.expanduser("~/Downloads/Devlopment/GitHub Repository/go-url-shortener")],
+        "type_msg": "Opening Go URL Shortener Project"
     }
 ]
 
 # Action to trigger on TRIPLE CLAP.
 SECONDARY_ACTION = {
     "command": "open",
-    "args": ["-a", "Google Chrome", "https://youtube.com"],
+    "args": ["-a", "Google Chrome", "https://youtu.be/syFZfO_wfMQ"],
     "type_msg": "Playing YouTube Video"
 }
 

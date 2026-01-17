@@ -1,13 +1,13 @@
-# Environment
-venv/
+# Python
 __pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+env/
+
+# Mac
 .DS_Store
 
-# Configuration with Private Keys
-# We ignore config.py because it contains the PORCUPINE_ACCESS_KEY
+# Sensitive Configuration (API Keys)
 config.py
-
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
