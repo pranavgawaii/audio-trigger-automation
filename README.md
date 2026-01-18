@@ -1,131 +1,99 @@
-# 🎤 Audio Automation - Voice & Clap Controlled App Launcher
+# 🎙️ Jarvis - Audio Automation for macOS
 
-> **Control your Mac with just your voice and claps!**
+> **"Just say it, double clap, and it's done."**  
+> A privacy-first, sci-fi inspired voice assistant for macOS.
 
-Manage your workflow hands-free. This Python based tool listens for a wake word and then detects clap patterns to launch applications or trigger custom actions.
-
----
-
-## ✨ Features
-
-- 🗣️ **Wake Word Activation**: Starts listening when you say "jarvis" (configurable).
-- 👏👏 **Double Clap**: Quickly launch a set of configured applications (e.g., VS Code, Chrome).
-- 👏👏👏 **Triple Clap**: Trigger a secondary action (e.g., play a music playlist, open a specific URL).
-- 🔒 **100% Private**: All audio processing happens locally on your device. No cloud recording.
-- ⚡ **Fast & Lightweight**: Built with `pvporcupine` for instant wake word detection.
-- 🎯 **Customizable**: Easily edit `config.py` to change apps, sensitivity, and timing.
-- 🆓 **Free to Use**: Runs on the free tier of the Picovoice Porcupine API.
+![macOS Verified](https://img.shields.io/badge/Platform-macOS-000000?style=flat-square&logo=apple)
+![Privacy](https://img.shields.io/badge/Privacy-100%25_Local-34C759?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Active-007AFF?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-gray?style=flat-square)
 
 ---
 
-## 📋 Requirements
+## 🌌 Overview
 
-- **Operating System**: macOS (Recommended) / Windows (Compatible but may require extra setup).
-- **Python**: Version 3.8 or higher.
-- **Hardware**: A working microphone.
-- **API Key**: A free AccessKey from [Picovoice Console](https://console.picovoice.ai/).
+**Jarvis** is a background utility that listens for a wake word ("Jarvis") and then waits for a **Clap Pattern** to trigger actions. Unlike Siri or Alexa, Jarvis runs **locally** on your device using Picovoice Porcupine, ensuring zero latency and zero data leaks.
+
+### ✨ Key Features
+
+*   **🗣️ Sonic Identity**: Jarvis speaks back ("Yes, Sir") using the 'Daniel' British voice.
+*   **👁️ Sci-Fi HUD**: A floating, futuristic "Orb" that pulses when listening and reacts to volume levels.
+*   **🔒 True Privacy Mode**: The microphone is **physically disconnected** when paused. No "Orange Dot" surveillance.
+*   **🎚️ Advanced Controls**: Settings Dashboard to adjust clap sensitivity (down to whisper levels), manage keys, and view logs.
+*   **🚀 Smart Launch**: Double-Clap to launch your workspace (VS Code, Chrome). Triple-Clap for media/secondary actions.
 
 ---
 
-## 🚀 Installation (macOS)
+## 🛠️ Usage
 
-### 1. Clone the project
-```bash
-git clone https://github.com/yourusername/audio-automation.git
-cd audio-automation
-```
+### 🚀 Quick Start
+1.  **Launch the App**: Open usage `Jarvis.app` or run `start_gui.sh`.
+2.  **Say "Jarvis"**: You will hear a *Hero* chime and "Yes, Sir".
+3.  **Clap Twice (👏👏)**: Launches your configured Development workspace.
 
-### 2. Set up the environment
-Ideally, create a virtual environment to keep dependencies clean:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Install Audio Drivers
-Required for `pyaudio` on macOS:
-```bash
-brew install portaudio
-```
-
-### 4. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+### 🎛️ Settings Dashboard
+Click the **Gear Icon** in the System Tray (Menu Bar) to open the Command Center:
+*   **Microphone Toggle**: Instantly cut mic access (Green = Live, Red = Off).
+*   **Sensitivity**: Adjust `100 - 5000` to tune clap detection.
+*   **System Log**: View real-time diagnostics ("Claps Detected: 2").
 
 ---
 
 ## ⚙️ Configuration
 
-Before running the app, you **MUST** configure it.
+Jarvis uses `config.py` for core settings.
 
-1.  **Get your Access Key**:
-    *   Sign up at [console.picovoice.ai](https://console.picovoice.ai/).
-    *   Copy your `AccessKey`.
-
-2.  **Edit `config.py`**:
-    *   Open `config.py` in your text editor.
-    *   Paste your key into the `PORCUPINE_ACCESS_KEY` variable:
-        ```python
-        PORCUPINE_ACCESS_KEY = "your_long_key_string_here"
-        ```
-
-3.  **Customize Apps**:
-    *   Modify the `APPS_TO_LAUNCH` list in `config.py` to add your favorite apps.
-    *   Example:
-        ```python
-        APPS_TO_LAUNCH = [
-            {"command": "open", "args": ["-a", "Spotify"], "type_msg": "Opening Spotify"},
-            {"command": "code", "args": ["~/MyProject"], "type_msg": "Opening VS Code"}
-        ]
-        ```
-
----
-
-## 🚦 Usage
-
-1.  **Run the script**:
+### 🔑 Setup (First Run)
+1.  **Get AccessKey**: Sign up for free at [Picovoice Console](https://console.picovoice.ai/).
+2.  **Clone Repo**:
     ```bash
-    python3 audio_launcher.py
+    git clone https://github.com/yourusername/audio-automation.git
+    cd audio-automation
     ```
-
-2.  **Wait for initialization**:
-    You will see:
+3.  **Install Dependencies**:
+    ```bash
+    brew install portaudio # Required for PyAudio
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
     ```
-    ============================================================
-    System Online. Wake word: 'jarvis'
-    Waiting for wake word...
-    ============================================================
-    ```
+4.  **Configure**:
+    Create `config.py` (see `config_example.py`) and paste your API Key.
 
-3.  **Commands**:
-    *   **Says "Jarvis"**: The system wakes up and listens for claps (default: 30 seconds).
-    *   **Clap Twice (👏👏)**: Launches your primary apps (VS Code, Chrome, etc.).
-    *   **Clap Three Times (👏👏👏)**: Triggers the secondary action (e.g., opens YouTube).
-
-4.  **Exit**:
-    Press `Ctrl+C` in the terminal to stop the program.
+### 🎵 Custom Sounds
+You can customize the sound effects in `config.py`:
+```python
+"sounds": {
+    "startup": "/System/Library/Sounds/Blow.aiff",
+    "wake": "/System/Library/Sounds/Hero.aiff", # Or set WAKE_RESPONSE to text
+    "success": "/System/Library/Sounds/Glass.aiff"
+}
+```
 
 ---
 
-## 🛠️ Customization
+## 🧩 Action Roadmap (Brick by Brick)
 
-All settings are adjustable in `config.py`:
-
-*   **`CLAP_THRESHOLD`**: Adjust microphone sensitivity. Lower this value if it doesn't hear your claps; raise it if it triggers on background noise.
-*   **`ACTIVE_DURATION`**: How long the system listens for claps after hearing the wake word.
-*   **`DEFAULT_WAKE_WORD`**: Change "jarvis" to "computer", "alexa", or other supported words.
-*   **`CLAP_INTERVAL`**: Adjust how fast you need to clap.
-
----
-
-## 📂 Project Structure
-
-*   `audio_launcher.py`: Main script handling audio input and logic.
-*   `config.py`: Central configuration file for all settings.
-*   `app_launcher.py`: Helper module for robust app management.
-*   `requirements.txt`: Python package dependencies.
+We are building Jarvis incrementally:
+- [x] **Core Engine**: Wake Word + Clap Detection.
+- [x] **Privacy**: Physical Mic Disconnect.
+- [x] **Sonic Identity**: TTS Feedback.
+- [ ] **Media Control**: "Jarvis, Next Song".
+- [ ] **Smart Home**: "Jarvis, Lights On".
 
 ---
 
-**Happy Automating!** 🚀
+## ⚠️ Troubleshooting
+
+**"The Orange Dot is still on!"**  
+Wait 5 seconds. macOS takes a moment to update the status bar after we terminate the driver.
+
+**"It ignores my claps!"**  
+Open Settings and lower the **Sensitivity Slider** to ~200. Ensure you aren't clapping too fast (0.5s interval is best).
+
+**"VS Code isn't opening!"**  
+Check the System Log. If you see `[Errno 2]`, it means the path is wrong. Use the "Test Action" button in Settings to debug.
+
+---
+
+built with 💙 by **Antigravity**
