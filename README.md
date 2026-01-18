@@ -96,4 +96,4 @@ Check the System Log. If you see `[Errno 2]`, it means the path is wrong. Use th
 
 ---
 
-built with 💙 by **Antigravity**
+built with 💙 by **pranavgawai**
