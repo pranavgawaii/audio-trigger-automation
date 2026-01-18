@@ -11,3 +11,10 @@ env/
 
 # Sensitive Configuration (API Keys)
 config.py
+config.json
+
+# Build Artifacts (PyInstaller)
+build/
+dist/
+*.spec
+

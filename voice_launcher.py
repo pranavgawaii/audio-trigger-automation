@@ -7,8 +7,9 @@ import contextlib
 import pyaudio
 import pvporcupine
 import config
+import math
+from PyQt6.QtCore import QThread, pyqtSignal
 
-# Context manager to suppress stderr (C-level)
 @contextlib.contextmanager
 def ignore_stderr():
     devnull = os.open(os.devnull, os.O_WRONLY)
@@ -23,36 +24,28 @@ def ignore_stderr():
         os.close(old_stderr)
 
 class ClapDetector:
-    def __init__(self):
+    def __init__(self, pyaudio_instance=None):
         self.chunk = config.CHUNK_SIZE
         self.format = pyaudio.paInt16
         self.channels = 1
         self.rate = config.SAMPLE_RATE
-        self.p = pyaudio.PyAudio()
+        self.p = pyaudio_instance if pyaudio_instance else pyaudio.PyAudio()
 
     def get_loudness(self, data):
-        # Convert binary data to integers
         count = len(data) // 2
         shorts = struct.unpack(f"{count}h", data)
         sum_squares = 0.0
         for sample in shorts:
             sum_squares += sample * sample
-        
-        if count == 0:
-            return 0
-            
+        if count == 0: return 0
         rms = (sum_squares / count) ** 0.5
         return rms
 
     def listen_for_claps(self, timeout=config.ACTIVE_DURATION):
-        """
-        Listens for claps. Returns the number of claps detected (0, 1, 2, 3...)
-        """
         if config.DEBUG_MODE:
             print(f"[DEBUG] Listening for claps for {timeout} seconds...")
 
         try:
-            # Suppress potential audio device warnings here too
             with ignore_stderr():
                 stream = self.p.open(format=self.format,
                                      channels=self.channels,
@@ -64,7 +57,6 @@ class ClapDetector:
             return 0
 
         start_time = time.time()
-        
         try:
             while (time.time() - start_time) < timeout:
                 try:
@@ -72,85 +64,97 @@ class ClapDetector:
                 except Exception as e:
                     print(f"[ERROR] Audio read error: {e}")
                     break
-                    
                 loudness = self.get_loudness(data)
-
                 if loudness > config.CLAP_THRESHOLD:
                     if config.DEBUG_MODE:
                         print(f"[DEBUG] First clap detected! (Loudness: {loudness:.2f})")
-                    # Once first clap is detected, start counting for the specific window
                     return self._count_subsequent_claps(stream)
-            
             return 0
-
         finally:
             with ignore_stderr():
                 stream.stop_stream()
                 stream.close()
 
     def _count_subsequent_claps(self, stream):
-        """
-        Called after the first clap is detected. Counts how many total claps occur within the window.
-        Returns the total count (including the first one).
-        """
         clap_count = 1
-        start_time_of_sequence = time.time()
-        last_clap_time = start_time_of_sequence
-        
-        # We listen for CLAP_INTERVAL seconds starting from the first clap
-        while (time.time() - start_time_of_sequence) < config.CLAP_INTERVAL:
+        start_time = time.time()
+        last_clap = start_time
+        while (time.time() - start_time) < config.CLAP_INTERVAL:
             try:
                 data = stream.read(self.chunk, exception_on_overflow=False)
-                loudness = self.get_loudness(data)
-                
-                if loudness > config.CLAP_THRESHOLD:
-                    current_time = time.time()
-                    # 150ms debounce
-                    if (current_time - last_clap_time) > 0.15: 
+                if self.get_loudness(data) > config.CLAP_THRESHOLD:
+                    now = time.time()
+                    if (now - last_clap) > 0.15: 
                         clap_count += 1
-                        last_clap_time = current_time
+                        last_clap = now
                         if config.DEBUG_MODE:
-                            print(f"[DEBUG] Subsequent clap detected! (Total: {clap_count})")
-            except Exception as e:
-                print(f"Error reading audio stream: {e}")
+                            print(f"[DEBUG] Subsequent clap: {clap_count}")
+            except Exception:
                 break
-        
         return clap_count
 
     def close(self):
-        self.p.terminate()
+        pass
 
-class VoiceLauncher:
+class VoiceLauncher(QThread):
+    wake_detected = pyqtSignal()      
+    listening_claps = pyqtSignal()    
+    success = pyqtSignal()            
+    audio_level = pyqtSignal(float)   
+    log_signal = pyqtSignal(str)      
+    
     def __init__(self):
-        self.clap_detector = ClapDetector()
+        super().__init__()
+        self.pa = pyaudio.PyAudio()
+        self.clap_detector = ClapDetector(self.pa)
         self.porcupine = None
         self.audio_stream = None
-        self.pa = pyaudio.PyAudio()
+        self.is_running = True
+        self.is_paused = False
         
         if not config.PORCUPINE_ACCESS_KEY:
-             print("\n" + "!" * 60)
-             print("ERROR: Porcupine AccessKey is missing in config.py")
-             print("Please get a key from https://console.picovoice.ai/ and add it.")
-             print("!" * 60 + "\n")
+             self.log_signal.emit("ERROR: Porcupine Key Missing")
              sys.exit(1)
 
         try:
-            # Try to initialize Porcupine
             self.porcupine = pvporcupine.create(
                 access_key=config.PORCUPINE_ACCESS_KEY,
                 keywords=[config.DEFAULT_WAKE_WORD]
             )
-        except ValueError as e:
-            print(f"[ERROR] Porcupine initialization failed: {e}")
-            sys.exit(1)
         except Exception as e:
             print(f"[ERROR] Error initializing Porcupine: {e}")
-            if "validation" in str(e).lower() or "accesskey" in str(e).lower():
-                 print("Please ensure you have a valid PORCUPINE_ACCESS_KEY in config.py.")
             sys.exit(1)
+
+    def play_sound(self, sound_key):
+        """Plays a system sound asynchronously."""
+        path = config.SOUNDS.get(sound_key)
+        if path and os.path.exists(path):
+            try:
+                subprocess.Popen(["afplay", path], stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+                
+    def speak(self, text):
+        """Speaks text using macOS native TTS."""
+        try:
+            # -v Daniel is the British English voice (Jarvis-like)
+            subprocess.Popen(["say", "-v", "Daniel", text], stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    def pause(self):
+        self.is_paused = True
+        self.log_signal.emit("Microphone: DISCONNECTED")
+        
+    def resume(self):
+        self.is_paused = False
+        self.log_signal.emit("Microphone: CONNECTED")
             
     def setup_audio_stream(self):
-        """Opens a fresh audio stream for Porcupine."""
+        if self.audio_stream and self.audio_stream.is_active(): return
+        if not self.pa:
+            self.pa = pyaudio.PyAudio()
+            self.clap_detector.p = self.pa
         try:
             with ignore_stderr():
                 self.audio_stream = self.pa.open(
@@ -161,98 +165,107 @@ class VoiceLauncher:
                     frames_per_buffer=self.porcupine.frame_length
                 )
         except Exception as e:
-            print(f"[ERROR] Could not open audio stream for wake word detection: {e}")
-            sys.exit(1)
+            self.log_signal.emit(f"Mic Error: {e}")
 
     def execute_command(self, app_config):
         cmd = app_config.get("command")
         args = app_config.get("args", [])
         msg = app_config.get("type_msg", "Executing command")
-        
         try:
+            self.log_signal.emit(f"Running: {msg}")
             print(f"[{msg}]...")
             full_command = [cmd] + args
-            # Using subprocess.Popen to not block execution
             subprocess.Popen(full_command)
         except Exception as e:
-            print(f"Failed to execute {cmd}: {e}")
+            self.log_signal.emit(f"Exec Error: {e}")
 
     def launch_apps(self):
-        print(f"Executing Double Clap Action: Launching apps...")
+        print(f"Executing Double Clap Action")
         for app_config in config.APPS_TO_LAUNCH:
             self.execute_command(app_config)
 
     def trigger_triple_action(self):
-        print("Executing Triple Clap Action...")
+        print("Executing Triple Clap Action")
         self.execute_command(config.SECONDARY_ACTION)
+        
+    def stop(self):
+        self.is_running = False
 
     def run(self):
         print("==" * 30)
-        print(f"System Online. Wake word: '{config.DEFAULT_WAKE_WORD}'")
-        print("Waiting for wake word...")
-        print("==" * 30)
+        self.log_signal.emit(f"System Online. Listening for '{config.DEFAULT_WAKE_WORD}'...")
+        self.play_sound("startup")
         
-        # Initial stream setup
         self.setup_audio_stream()
+        
+        while self.is_running:
+            if self.is_paused:
+                if self.audio_stream:
+                    with ignore_stderr():
+                        self.audio_stream.stop_stream()
+                        self.audio_stream.close()
+                    self.audio_stream = None
+                if self.pa:
+                    self.pa.terminate()
+                    self.pa = None
+                time.sleep(0.5)
+                continue
+            else:
+                if not self.audio_stream:
+                    self.setup_audio_stream()
 
-        try:
-            while True:
-                # Read audio frame
+            try:
                 try:
-                    pcm = self.audio_stream.read(self.porcupine.frame_length, exception_on_overflow=False)
-                except IOError:
-                    # Sometimes overflow happens, ignore
+                    pcm_bytes = self.audio_stream.read(self.porcupine.frame_length, exception_on_overflow=False)
+                except Exception:
                     continue
                 
-                # Unpack struct to tuple of ints
-                pcm = struct.unpack_from("h" * self.porcupine.frame_length, pcm)
-
-                # Process with Porcupine
+                pcm = struct.unpack_from("h" * self.porcupine.frame_length, pcm_bytes)
+                rms = math.sqrt(sum(x**2 for x in pcm) / len(pcm))
+                level = min(rms / 5000.0, 1.0)
+                self.audio_level.emit(level)
+                
                 keyword_index = self.porcupine.process(pcm)
-
+                
                 if keyword_index >= 0:
-                    print(f"\n[{time.strftime('%H:%M:%S')}] Wake word '{config.DEFAULT_WAKE_WORD}' detected!")
-                    print(f"Listening for claps for {config.ACTIVE_DURATION} seconds...")
+                    self.log_signal.emit("Wake Word Detected!")
+                    self.wake_detected.emit()
+                    self.speak(config.WAKE_RESPONSE) # Replaced play_sound("wake")
                     
-                    # COMPLETELY CLOSE the stream to release the mic for ClapDetector
-                    # This prevents the "PaMacCore" -50 error and sync issues
                     if self.audio_stream:
-                        with ignore_stderr():
-                            self.audio_stream.close()
+                        self.audio_stream.stop_stream()
+                        self.audio_stream.close()
                         self.audio_stream = None
                     
                     try:
-                        # Listen for claps
+                        self.listening_claps.emit()
                         num_claps = self.clap_detector.listen_for_claps(timeout=config.ACTIVE_DURATION)
-                        
-                        print(f"Sequence finished. Total claps detected: {num_claps}")
+                        self.log_signal.emit(f"Claps Detected: {num_claps}")
                         
                         if num_claps == 2:
-                            print("Double detected! Launching apps.")
+                            self.play_sound("success")
+                            self.log_signal.emit("Action: Double Clap")
+                            self.success.emit()
                             self.launch_apps()
                         elif num_claps == 3:
-                            print("Triple clap detected! Triggering secondary action.")
+                            self.play_sound("success")
+                            self.log_signal.emit("Action: Triple Clap")
+                            self.success.emit()
                             self.trigger_triple_action()
                         else:
-                            print("No valid clap pattern detected or action ignored.")
+                            self.log_signal.emit("Ignored.")
+                            self.play_sound("error")
                             
                     finally:
-                        # Re-open a FRESH stream for wake word listening
-                        print("\nResuming wake word listening...")
+                        self.log_signal.emit("Resuming Watch...")
                         self.setup_audio_stream()
 
-        except KeyboardInterrupt:
-            print("\nStopping...")
-        finally:
-            if self.porcupine:
-                self.porcupine.delete()
-            if self.audio_stream:
-                self.audio_stream.close()
-            if self.pa:
-                self.pa.terminate()
-            if self.clap_detector:
-                self.clap_detector.close()
-
-if __name__ == "__main__":
-    app = VoiceLauncher()
-    app.run()
+            except Exception:
+                 if not self.audio_stream:
+                      self.setup_audio_stream()
+            except KeyboardInterrupt:
+                break
+                
+        if self.porcupine: self.porcupine.delete()
+        if self.audio_stream: self.audio_stream.close()
+        if self.pa: self.pa.terminate()
